@@ -24,6 +24,9 @@ class Exam(me.Document):
     # MSCI course...
     info_known = me.BooleanField();
 
+    # Special notes likes 'Exam removed from the schedule'
+    notes = me.StringField();
+
     # Instead of having start_date and end_date, we can have url instead
     # So far this only applies to WLU courses on the UW schedule. Same URL
     url = me.StringField()

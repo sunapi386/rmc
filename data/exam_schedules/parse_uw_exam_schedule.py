@@ -63,6 +63,7 @@ def parse_exam_schedule():
         # day_of_week_pattern = re.compile(
         index = 2
         section_string = ''
+        # TODO(Sandy): Instead of not is_day_of_week, check for is_section
         while not is_day_of_week(safe_list_get(tokens, index)):
             section_string = safe_list_get(tokens, index) + ' '
             index += 1
