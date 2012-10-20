@@ -207,6 +207,7 @@ function(RmcBackbone, $, _jqueryui, _, _s, ratings, _select2, _autosize, _course
         event,
         label
       ]);
+      mixpanel.track('Test rating/review event', this.userCourse);
     },
 
     onProfSelect: function() {

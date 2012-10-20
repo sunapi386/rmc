@@ -66,6 +66,7 @@ function($, _, _s, transcript, util) {
       'USER_GENERIC',
       'TRANSCRIPT_UPLOAD'
     ]);
+    mixpanel.track('Transcript uploaded');
     $.post(
       '/api/transcript',
       {
