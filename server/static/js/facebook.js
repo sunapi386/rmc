@@ -140,8 +140,8 @@ function($, __, FB) {
         method: 'send',
         name: 'Flow',
         link: sendDialogLink,
-        picture: 'http://uwflow.com/static/img/logo/flow_75x75.png',
-        description: 'Plan your course with friends in mind!'
+        picture: sendDialogLink + '/static/img/logo/flow_75x75.png',
+        description: 'Plan your courses with friends in mind!'
       }, cb);
   }
 

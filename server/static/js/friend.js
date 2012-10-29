@@ -1,7 +1,7 @@
 define(
 ['rmc_backbone', 'ext/jquery', 'ext/underscore', 'ext/underscore.string',
 'ext/bootstrap', 'ext/slimScroll', 'course', 'facebook'],
-function(RmcBackbone, $, _, _s, bootstrap, __, _course, facebook) {
+function(RmcBackbone, $, _, _s, bootstrap, __, _course, _facebook) {
 
   var FriendView = RmcBackbone.View.extend({
     className: 'friend',
@@ -185,7 +185,7 @@ function(RmcBackbone, $, _, _s, bootstrap, __, _course, facebook) {
           from_page: 'profile'
         });
 
-        facebook.showSendDialogProfile(function(response) {
+        _facebook.showSendDialogProfile(function(response) {
           if (response && response.success) {
             // Facebook engagement completed
             mixpanel.track('Facebook engagement completed', {
