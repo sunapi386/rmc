@@ -75,9 +75,9 @@
           Courses: {{ current_user.course_history|length }},
           Friends: {{ current_user.friend_ids|length }},
           Gender: {{ current_user.gender|tojson|safe }},
-          Profile: {{ current_user.absolute_profile_url|tojson|safe }}
+          Profile: {{ current_user.absolute_profile_url|tojson|safe }},
           Program: {{ current_user.short_program_name|tojson|safe }},
-          Year: {{ current_user.last_program_year_id|tojson|safe }},
+          Year: {{ current_user.last_program_year_id|tojson|safe }}
         });
         {% if current_user.name -%}
           mixpanel.name_tag({{ current_user.name|tojson|safe }});
