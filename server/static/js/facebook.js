@@ -132,10 +132,24 @@ function($, __, FB) {
     });
   };
 
+  var showSendDialogProfile = function(cb) {
+    // TODO(Sandy): Don't hardcode link?
+    var sendDialogLink = 'http://uwflow.com';
+
+    FB.ui({
+        method: 'send',
+        name: 'Flow',
+        link: sendDialogLink,
+        picture: 'http://uwflow.com/static/img/logo/flow_75x75.png',
+        description: 'Plan your course with friends in mind!'
+      }, cb);
+  }
+
   return {
+    initConnectButton: initConnectButton,
     loginIfPossible: loginIfPossible,
     logout: logout,
-    initConnectButton: initConnectButton
+    showSendDialogProfile: showSendDialogProfile
   };
 
 });
