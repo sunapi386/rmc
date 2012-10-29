@@ -143,7 +143,7 @@ function($, __, FB) {
         picture: sendDialogLink + '/static/img/logo/flow_75x75.png',
         description: 'Plan your courses with friends in mind!'
       }, cb);
-  }
+  };
 
   return {
     initConnectButton: initConnectButton,
