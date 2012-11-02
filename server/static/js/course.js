@@ -351,7 +351,7 @@ function(RmcBackbone, $, _, _s, ratings, __, util, jqSlide, _prof, toastr) {
     },
 
     removeTranscriptCourse: function(evt) {
-      console.log('removing');
+      $('#confirm-remove-modal').modal('hide');
       var onSuccess = _.bind(function(resp) {
         toastr.info(
           _s.sprintf('%s was removed!', this.courseModel.get('name'))
