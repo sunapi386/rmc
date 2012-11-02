@@ -136,11 +136,12 @@ if (other_profile) {
     role="dialog" aria-labelledby="myModalLabel">
   <div class="modal-header">
     <button type="button" class="close" data-dismiss="modal">×</button>
-    <h3 id="myModalLabel">Remove COURSE from profile</h3>
+    <h3 id="myModalLabel">Remove <%- course_code %> from profile</h3>
   </div>
   <div class="modal-body">
     <p>
-      Your ratings and reviews for COURSE will also be moved. Are you sure?
+      Your ratings and reviews for <%- course_code %> will also be removed. Are
+      you sure?
     </p>
   </div>
   <div class="modal-footer">

@@ -343,7 +343,9 @@ function(RmcBackbone, $, _, _s, ratings, __, util, jqSlide, _prof, toastr) {
       $('#confirm-remove-modal').remove();
 
       $('body').append(
-          _.template($('#course-confirm-remove-dialog-tpl').html(), {}));
+          _.template($('#course-confirm-remove-dialog-tpl').html(), {
+            course_code: this.courseModel.get('code')
+          }));
       $('#confirm-remove-modal-button-yes').click(
           _.bind(this.removeTranscriptCourse, this, evt));
 
