@@ -350,6 +350,11 @@ function(RmcBackbone, $, _, _s, ratings, __, util, jqSlide, _prof, toastr) {
           _.bind(this.removeTranscriptCourse, this, evt));
 
       $('#confirm-remove-modal').modal('show');
+
+      mixpanel.track('Removed transcript course intent', {
+        course_id: this.courseModel.id.$oid
+      });
+      mixpanel.people.increment({'Removed transcript course intent': 1});
     },
 
     removeTranscriptCourse: function(evt) {
