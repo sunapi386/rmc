@@ -7,7 +7,9 @@ import mongoengine as me
 import pymongo
 import re
 import redis
+import requests
 import time
+import urlparse
 
 import rmc.shared.constants as c
 import rmc.shared.secrets as s
@@ -123,6 +125,86 @@ def get_current_user():
 
     return req.current_user
 
+# TODO(Sandy): Move to facebook.py file? bring urlparse and requests modules too
+def get_fb_app_secret():
+    if app.config['ENV'] == 'dev':
+        app_secret = s.FB_APP_SECRET_DEV
+    else:
+        app_secret = s.FB_APP_SECRET_PROD
+    return app_secret
+
+def get_fb_app_id():
+    if app.config['ENV'] == 'dev':
+        app_id = c.FB_APP_ID_DEV
+    else:
+        app_id = c.FB_APP_ID_PROD
+    return app_id
+
+def get_fb_token(code):
+    """
+    Returns a dictionary containing the user's Facebook access token and seconds
+    until it expires from now
+
+    See https://developers.facebook.com/blog/post/2011/05/13/how-to--handle-expired-access-tokens/
+
+    Right now, the resulting token is a short-lived token (~2 hours). But it's
+    possible that this is wrong and that it should be a long-term token instead.
+    See https://developers.facebook.com/bugs/341793929223330/
+
+    Args:
+        code: The code we get from their fb_signed_request
+
+    Returns {
+        'access_token': 'token-here-blarg',
+        'expires': 6200,
+    }
+    """
+    print "in fetch fb token"
+    print code
+    # Since we're exchanging a client-side token, redirect_uri should be ''
+    token_url = ("https://graph.facebook.com/oauth/access_token?"
+            "client_id=%s&"
+            "redirect_uri=%s&"
+            "client_secret=%s&"
+            "code=%s"
+            % (get_fb_app_id(), '', get_fb_app_secret(), code))
+    resp = requests.get(token_url)
+    print 'response'
+    print resp
+    print resp.text
+    result = dict(urlparse.parse_qsl(resp.text))
+    print result
+    return result
+
+def get_fb_long_token(short_token):
+    """
+    Returns a dictionary containing the user's long Facebook access token and
+    seconds until it expires from now
+
+    Args:
+        short_token: The short-lived token we're exchanging
+
+    Returns {
+        'access_token': 'token-here-blarg',
+        'expires': 5184000,
+    }
+    """
+    print "in long token"
+    print short_token
+    # Since we're exchanging a client-side token, redirect_uri should be ''
+    exchange_url = ("https://graph.facebook.com/oauth/access_token?"
+            "grant_type=fb_exchange_token&"
+            "client_id=%s&"
+            "client_secret=%s&"
+            "fb_exchange_token=%s"
+            % (get_fb_app_id(), get_fb_app_secret(), short_token))
+    resp = requests.get(exchange_url)
+    print 'response'
+    print resp
+    print resp.text
+    result = dict(urlparse.parse_qsl(resp.text))
+    print result
+    return result
 
 def login_required(f):
     @functools.wraps(f)
@@ -653,14 +735,30 @@ def login():
             int(time.time()) + int(fb_access_token_expires_in) - 10)
 
     # Validate against Facebook's signed request
-    if app.config['ENV'] == 'dev':
-        fb_data = parse_signed_request(fbsr, s.FB_APP_SECRET_DEV)
-    else:
-        fb_data = parse_signed_request(fbsr, s.FB_APP_SECRET_PROD)
+    fb_data = parse_signed_request(fbsr, get_fb_app_secret())
 
     if fb_data is None or fb_data['user_id'] != fbid:
         # Data is invalid
         return 'Error'
+
+    code = fb_data.get('code')
+    if code:
+        result_dict = get_fb_token(code)
+        short_access_token = result_dict.get('access_token')
+        if short_access_token:
+            exchanged_dict = get_fb_long_token(short_access_token)
+            long_access_token = result_dict.get('access_token')
+            token_expires_in = result_dict.get('expires')
+            if long_access_token is None or token_expires_in is None:
+                logging.warn('Failed to exchange (%s) for long access token'
+                % short_access_token)
+
+            # TODO(Sandy): We have the long access token now, store and use it!
+        else:
+            logging.warn('Failed to exchange code (%s) for token' % code)
+    else:
+        # Shouldn't happen, Facebook messed up
+        logging.warn('No "code" field in fbsr. Blame FB')
 
     # FIXME[uw](mack): Someone could pass fake fb_access_token for an fbid, need to
     # validate on facebook before creating the user. (Sandy): See the note above on using signed_request
