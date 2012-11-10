@@ -785,6 +785,35 @@ def get_courses(course_ids):
         'professor_objs': professor_objs,
     })
 
+@app.route('/api/fb-updates', methods=['GET', 'POST'])
+def fb_api_updates():
+    req = flask.request
+
+    rmclogger.log_event(
+        rmclogger.LOG_CATEGORY_API,
+        rmclogger.LOG_EVENT_FB_API_UPDATES, {
+            'args': req.args,
+            'request_form': req.form,
+        },
+    )
+
+    if (req.method == 'GET' and
+        req.args.get('hub.mode') == 'subscribe' and
+        req.args.get('hub.verify_token') == s.FB_API_REALTIME_VERIFY_TOKEN):
+        # One time subscription requests
+        # https://developers.facebook.com/docs/howtos/managing-realtime-update-subscriptions/
+        return req.args.get('hub.challenge')
+    elif req.method == 'POST':
+        # FB updates ocurred
+        # https://developers.facebook.com/docs/reference/api/realtime/
+        # TODO(Sandy): Do stuff here. FB is broken right now:
+        # https://developers.facebook.com/bugs/374296595988186?browse=search_50990ddb8a19d9316431973
+        print '/api/fb-updates with POST'
+    else:
+        logging.warn('Invalid request to /api/fb-updates')
+
+    return ''
+
 COURSES_SORT_MODES = [
     # TODO(david): Usefulness
     { 'value': 'num_ratings', 'name': 'popular', 'direction': pymongo.DESCENDING, 'field': 'interest.count' },
@@ -942,7 +971,9 @@ def upload_transcript():
         rmclogger.LOG_CATEGORY_API,
         rmclogger.LOG_EVENT_TRANSCRIPT, {
             'user_id': user_id,
-            'requset_form': req.form,
+            # NOTE: There was a typo here as 'requset_form'. When extract
+            # data from past server logs before Nov. 9 2012, keep this in mind.
+            'request_form': req.form,
         },
     )
 
