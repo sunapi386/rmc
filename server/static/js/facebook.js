@@ -172,6 +172,34 @@ function($, _, __) {
     };
   });
 
+  var renewAccessToken = function() {
+    // TODO(Sandy): Grab fbsr from the Fb.getLoginStatus endpoint and hit /login
+    console.log('pretend to renew access token');
+  }
+
+  var init = function() {
+    // XXX(Sandy): Note to reviewers: What is your opinion on defining local
+    // variables things that are used a few times? I've heard arguments for
+    // portability, readability, etc. what do you guys prefer?
+    expiry_timestamp = $.cookie('fb_access_token_expires_on');
+    //expiry_timestamp -= 60 * 60 * 24;
+    if (expiry_timestamp) {
+      expiry_date = new Date(1000 * expiry_timestamp);
+      // Renew the token every day
+      // TODO(Sandy): When handling users with FB Adblocked, consider this case
+      // as well (right now it should fail gracefully, but we still want a way to
+      // renew the token)
+      if (expiry_date - new Date() < 1000 * 60 * 60 * 24 * 59) {
+        renewAccessToken();
+      }
+    }
+  }
+
+  // XXX(Sandy): Note to reviewers: This is low priority and we want to defer
+  // until after _everything_ is loaded and finished. What's the best way of
+  // doing that?
+  $(init());
+
   return _.extend(ensureInitMethods, {
     initFacebook: initFacebook,
     initializedFacebook: initializedFacebook

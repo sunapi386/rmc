@@ -763,16 +763,20 @@ def login():
                         int(time.time()) + int(token_expires_in) - 10)
                 @after_this_request
                 def set_user_cookie(response):
+                    expiry_date_timestamp = time.mktime(
+                            fb_access_token_expiry_date.timetuple())
+                    response.set_cookie('fb_access_token_expires_on',
+                            expiry_date_timestamp, 31536000)
                     # TODO(Sandy): Migrate to Flask sessions...
                     response.set_cookie('fb_access_token',
                             fb_access_token, 31536000)
-                    response.set_cookie('fb_access_token_expires_in',
-                            fb_access_token_expiry_date, 31536000)
                     return response
             else:
                 logging.warn('Failed to exchange (%s) for long access token'
                         % short_access_token)
         else:
+            # XXX(Sandy): Fix bug where double login causes logout. infact, find
+            # out why errors cause logouts at all
             logging.warn('Failed to exchange code (%s) for token' % code)
     else:
         # Shouldn't happen, Facebook messed up
