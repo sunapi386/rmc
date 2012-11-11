@@ -1,7 +1,10 @@
 from rmc.config.flask_base import *
+import rmc.shared.secrets as s
 
 JS_DIR = 'js_prod'
 DEBUG = False
 ENV = 'prod'
 GA_PROPERTY_ID = 'UA-35073503-1'
 LOG_PATH = '/home/rmc/logs/server/server.log'
+FB_APP_ID = '219309734863464'
+FB_APP_SECRET = s.FB_APP_SECRET_PROD

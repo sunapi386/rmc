@@ -24,10 +24,6 @@ RATINGS_CONFIDENCE = 0.95
 
 EMAIL_SENDER = 'Flow Developers <flow@uwflow.com>'
 
-# Facebook App IDs
-FB_APP_ID_DEV = '289196947861602'
-FB_APP_ID_PROD = '219309734863464'
-
 # Demo accounts
 # TODO(Sandy): Have multiple demo accounts?
 DEMO_ACCOUNT_FBID = '100004384843130'

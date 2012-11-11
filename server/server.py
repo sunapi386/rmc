@@ -138,20 +138,6 @@ def get_current_user():
     return req.current_user
 
 # TODO(Sandy): Move to facebook.py file? bring urlparse and requests modules too
-def get_fb_app_secret():
-    if app.config['ENV'] == 'dev':
-        app_secret = s.FB_APP_SECRET_DEV
-    else:
-        app_secret = s.FB_APP_SECRET_PROD
-    return app_secret
-
-def get_fb_app_id():
-    if app.config['ENV'] == 'dev':
-        app_id = c.FB_APP_ID_DEV
-    else:
-        app_id = c.FB_APP_ID_PROD
-    return app_id
-
 def get_fb_token(code):
     """
     Returns a dictionary containing the user's Facebook access token and seconds
@@ -179,7 +165,7 @@ def get_fb_token(code):
             "redirect_uri=%s&"
             "client_secret=%s&"
             "code=%s"
-            % (get_fb_app_id(), '', get_fb_app_secret(), code))
+            % (app.config['FB_APP_ID'], '', app.config['FB_APP_SECRET'], code))
     resp = requests.get(token_url)
     print 'response'
     print resp
@@ -209,7 +195,7 @@ def get_fb_long_token(short_token):
             "client_id=%s&"
             "client_secret=%s&"
             "fb_exchange_token=%s"
-            % (get_fb_app_id(), get_fb_app_secret(), short_token))
+            % (app.config['FB_APP_ID'], app.config['FB_APP_SECRET'], short_token))
     resp = requests.get(exchange_url)
     print 'response'
     print resp
@@ -740,7 +726,7 @@ def login():
             return 'Error'
 
     # Validate against Facebook's signed request
-    fb_data = parse_signed_request(fbsr, get_fb_app_secret())
+    fb_data = parse_signed_request(fbsr, app.config['FB_APP_SECRET'])
 
     if fb_data is None or fb_data['user_id'] != fbid:
         # Data is invalid
