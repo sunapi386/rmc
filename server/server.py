@@ -80,6 +80,18 @@ def tojson(obj):
 def version(file_name):
     return '%s?v=%s' % (file_name, VERSION)
 
+def after_this_request(f):
+    if not hasattr(flask.g, 'after_request_callbacks'):
+        flask.g.after_request_callbacks = []
+    flask.g.after_request_callbacks.append(f)
+    return f
+
+@app.after_request
+def call_after_request_callbacks(response):
+    for callback in getattr(flask.g, 'after_request_callbacks', ()):
+        response = callback(response)
+    return response
+
 class ApiError(Exception):
     """
         All errors during api calls should use this rather than Exception
@@ -680,7 +692,10 @@ def login():
         return base64.b64decode(unicode(inp).translate(dict(zip(map(ord, u'-_'), u'+/'))))
 
     def parse_signed_request(signed_request, secret):
-
+        """
+        Returns a dict of the the Facebook signed request object
+        See https://developers.facebook.com/docs/authentication/signed_request/
+        """
         l = signed_request.split('.', 2)
         encoded_sig = l[0]
         payload = l[1]
@@ -702,37 +717,27 @@ def login():
     req = flask.request
 
     # TODO(Sandy): Use Flask Sessions instead of raw cookie
+    # http://flask.pocoo.org/docs/quickstart/#sessions
 
+    # TODO(Sandy): No need to send fbid either. fbsr is all we need!
     fbid = req.cookies.get('fbid')
-    # FIXME[uw](Sandy): No need to pass the fb_access_token up, we can just exchange fb_data.code for the token from FB
-    # https://developers.facebook.com/docs/authentication/signed_request/
-    fb_access_token = req.cookies.get('fb_access_token')
-    # Compensate for network latency by subtracting 10 seconds
-    fb_access_token_expires_in = req.cookies.get('fb_access_token_expires_in')
     fbsr = req.form.get('fb_signed_request')
 
     rmclogger.log_event(
         rmclogger.LOG_CATEGORY_API,
         rmclogger.LOG_EVENT_LOGIN, {
             'fbid': fbid,
-            'token': fb_access_token,
-            'expires_in': fb_access_token_expires_in,
             'fbsr': fbsr,
             'request_form': req.form,
         },
     )
 
     if (fbid is None or
-        fb_access_token is None or
-        fb_access_token_expires_in is None or
         fbsr is None):
             # TODO(Sandy): redirect to landing page, or nothing
             # Shouldn't happen normally, user probably manually requested this page
             logging.warn('No fbid/access_token specified')
             return 'Error'
-
-    fb_access_token_expiry_date = datetime.fromtimestamp(
-            int(time.time()) + int(fb_access_token_expires_in) - 10)
 
     # Validate against Facebook's signed request
     fb_data = parse_signed_request(fbsr, get_fb_app_secret())
@@ -741,19 +746,32 @@ def login():
         # Data is invalid
         return 'Error'
 
+    # TODO(Sandy): Migrate to Flask sessions so null tokens won't be a problem
+    fb_access_token = "NO_ACCESS_TOKEN"
+    fb_access_token_expiry_date = datetime.now()
     code = fb_data.get('code')
     if code:
         result_dict = get_fb_token(code)
         short_access_token = result_dict.get('access_token')
         if short_access_token:
-            exchanged_dict = get_fb_long_token(short_access_token)
+            result_dict = get_fb_long_token(short_access_token)
             long_access_token = result_dict.get('access_token')
             token_expires_in = result_dict.get('expires')
-            if long_access_token is None or token_expires_in is None:
+            if long_access_token and token_expires_in:
+                fb_access_token = long_access_token
+                fb_access_token_expiry_date = datetime.fromtimestamp(
+                        int(time.time()) + int(token_expires_in) - 10)
+                @after_this_request
+                def set_user_cookie(response):
+                    # TODO(Sandy): Migrate to Flask sessions...
+                    response.set_cookie('fb_access_token',
+                            fb_access_token, 31536000)
+                    response.set_cookie('fb_access_token_expires_in',
+                            fb_access_token_expiry_date, 31536000)
+                    return response
+            else:
                 logging.warn('Failed to exchange (%s) for long access token'
-                % short_access_token)
-
-            # TODO(Sandy): We have the long access token now, store and use it!
+                        % short_access_token)
         else:
             logging.warn('Failed to exchange code (%s) for token' % code)
     else:

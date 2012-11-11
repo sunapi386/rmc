@@ -46,10 +46,6 @@ function($, _, __) {
     // TODO(Sandy): When switching over to Flask sessions be sure to remove
     // these old cookies
     $.cookie('fbid', authResp.userID, { expires: 365, path: '/' });
-    $.cookie('fb_access_token', authResp.accessToken,
-        { expires: 365, path: '/' });
-    $.cookie('fb_access_token_expires_in', authResp.expiresIn,
-        { expires: 365, path: '/' });
     // TODO(Sandy): This assumes the /login request will succeed, which may not
     // be the case. But if we make this request in the success handler, it might
     // not get logged at all (due to redirect). We could setTimeout it, but that
