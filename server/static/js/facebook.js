@@ -3,6 +3,7 @@ define(
 function($, _, __) {
 
   var fbApiInit = false;
+  var fbAppId;
   if (window.pageData.env === 'dev') {
     fbAppId = '289196947861602';
   } else {
