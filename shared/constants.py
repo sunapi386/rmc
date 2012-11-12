@@ -27,3 +27,6 @@ EMAIL_SENDER = 'Flow Developers <flow@uwflow.com>'
 # Demo accounts
 # TODO(Sandy): Have multiple demo accounts?
 DEMO_ACCOUNT_FBID = '100004384843130'
+
+COOKIE_EXPIRATION_DURATION = 60 * 60 * 24 * 365
+FB_NO_ACCESS_TOKEN = 'NO_ACCESS_TOKEN'

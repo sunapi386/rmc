@@ -138,6 +138,7 @@ def get_current_user():
     return req.current_user
 
 # TODO(Sandy): Move to facebook.py file? bring urlparse and requests modules too
+# TODO(Sandy): Rename these function names to be less ambiguous after ^
 def get_fb_token(code):
     """
     Returns a dictionary containing the user's Facebook access token and seconds
@@ -204,7 +205,115 @@ def get_fb_long_token(short_token):
     print result
     return result
 
+# TODO(Sandy): Maybe make it so that even if fbsr parsing fails, we can still
+# create account? Probably safe to assume facebook is realiable enough for this
+# though...
+def get_fb_data(signed_request):
+    """
+    Get FB access token and expiry information from the Facebook signed request
+
+    A long-lived token should be returned (60 days expiration), if everything
+    went smoothly.
+
+    Returns {
+        'access_token': 'token-here-blarg',
+        'expires_on': 5184000,
+        'fbid': 123456789,
+    }
+    """
+    def base64_url_decode(inp):
+        padding_factor = (4 - len(inp) % 4) % 4
+        inp += "="*padding_factor
+        return base64.b64decode(unicode(inp).translate(dict(zip(map(ord, u'-_'), u'+/'))))
+
+    def parse_signed_request(signed_request, secret):
+        """
+        Returns a dict of the the Facebook signed request object
+        See https://developers.facebook.com/docs/authentication/signed_request/
+        """
+        l = signed_request.split('.', 2)
+        encoded_sig = l[0]
+        payload = l[1]
+
+        sig = base64_url_decode(encoded_sig)
+        data = util.json_loads(base64_url_decode(payload))
+
+        if data.get('algorithm').upper() != 'HMAC-SHA256':
+            logging.error('Unknown algorithm during signed request decode')
+            return None
+
+        expected_sig = hmac.new(secret, msg=payload, digestmod=hashlib.sha256).digest()
+
+        if sig != expected_sig:
+            return None
+
+        return data
+
+    # Validate against Facebook's signed request
+    fbsr_data = parse_signed_request(signed_request, app.config['FB_APP_SECRET'])
+
+    # TODO(Sandy): Maybe move this somewhere else since it can raise an error
+    if fbsr_data is None or not fbsr_data.get('user_id'):
+        # TODO(Sandy): Test if the logging.warn is necessary
+        logging.warn("Could not parse Facebook signed request (%s)"
+                % signed_request)
+        raise ApiError("Could not parse Facebook signed request (%s)"
+                % signed_request)
+
+    # TODO(Sandy): Migrate to Flask sessions so null tokens won't be a problem
+    fb_access_token = c.FB_NO_ACCESS_TOKEN
+    fb_access_token_expiry_date = datetime.now()
+    code = fbsr_data.get('code')
+    if code:
+
+        result_dict = get_fb_token(code)
+
+        short_access_token = result_dict.get('access_token')
+        if short_access_token:
+
+            result_dict = get_fb_long_token(short_access_token)
+
+            long_access_token = result_dict.get('access_token')
+            token_expires_in = result_dict.get('expires')
+            if long_access_token and token_expires_in:
+                fb_access_token = long_access_token
+                fb_access_token_expiry_date = datetime.fromtimestamp(
+                        int(time.time()) + int(token_expires_in) - 10)
+            else:
+                logging.warn('Failed to exchange (%s) for long access token'
+                        % short_access_token)
+        else:
+            # XXX(Sandy): Fix bug where double login causes logout. infact, find
+            # out why errors cause logouts at all. Edit: seems to be the error
+            # handler on the client causing the logouts...
+            logging.warn('Failed to exchange code (%s) for token' % code)
+    else:
+        # Shouldn't happen, Facebook messed up
+        logging.warn('No "code" field in fbsr. Blame FB')
+
+    return {
+        'access_token': fb_access_token,
+        'expires_on': fb_access_token_expiry_date,
+        'fbid': fbsr_data['user_id'],
+    }
+
+def update_client_cookie(cookies):
+    """
+    Sets the client cookies as specified by the input dict "cookies"
+
+    This is called after the request is processed and before sending the
+    response back. Therefore, when making multiple calls to this function with
+    the same keys, the last one should persist (theoretically)
+    """
+    @after_this_request
+    def set_user_cookie(response):
+        for key, val in cookies.items():
+            response.set_cookie(key, val, c.COOKIE_EXPIRATION_DURATION)
+        return response
+
 def login_required(f):
+    # TODO(Sandy): Code here to detect/handle the (should be rare) case of
+    # cookie.fbid != current_user.fbid
     @functools.wraps(f)
     def wrapper(*args, **kwargs):
         if not get_current_user():
@@ -671,35 +780,6 @@ def onboarding():
 
 @app.route('/login', methods=['POST'])
 def login():
-    # TODO(Sandy): move this to a more appropriate place
-    def base64_url_decode(inp):
-        padding_factor = (4 - len(inp) % 4) % 4
-        inp += "="*padding_factor
-        return base64.b64decode(unicode(inp).translate(dict(zip(map(ord, u'-_'), u'+/'))))
-
-    def parse_signed_request(signed_request, secret):
-        """
-        Returns a dict of the the Facebook signed request object
-        See https://developers.facebook.com/docs/authentication/signed_request/
-        """
-        l = signed_request.split('.', 2)
-        encoded_sig = l[0]
-        payload = l[1]
-
-        sig = base64_url_decode(encoded_sig)
-        data = util.json_loads(base64_url_decode(payload))
-
-        if data.get('algorithm').upper() != 'HMAC-SHA256':
-            logging.error('Unknown algorithm during fbsr decode')
-            return None
-
-        expected_sig = hmac.new(secret, msg=payload, digestmod=hashlib.sha256).digest()
-
-        if sig != expected_sig:
-            return None
-
-        return data
-
     req = flask.request
 
     # TODO(Sandy): Use Flask Sessions instead of raw cookie
@@ -709,6 +789,7 @@ def login():
     fbid = req.cookies.get('fbid')
     fbsr = req.form.get('fb_signed_request')
 
+    # TODO(Sandy): Change log category because this isn't API?
     rmclogger.log_event(
         rmclogger.LOG_CATEGORY_API,
         rmclogger.LOG_EVENT_LOGIN, {
@@ -720,53 +801,13 @@ def login():
 
     if (fbid is None or
         fbsr is None):
-            # TODO(Sandy): redirect to landing page, or nothing
-            # Shouldn't happen normally, user probably manually requested this page
-            logging.warn('No fbid/access_token specified')
-            return 'Error'
+            logging.warn('No fbsr set')
+            raise ApiError('No fbsr set')
 
-    # Validate against Facebook's signed request
-    fb_data = parse_signed_request(fbsr, app.config['FB_APP_SECRET'])
-
-    if fb_data is None or fb_data['user_id'] != fbid:
-        # Data is invalid
-        return 'Error'
-
-    # TODO(Sandy): Migrate to Flask sessions so null tokens won't be a problem
-    fb_access_token = "NO_ACCESS_TOKEN"
-    fb_access_token_expiry_date = datetime.now()
-    code = fb_data.get('code')
-    if code:
-        result_dict = get_fb_token(code)
-        short_access_token = result_dict.get('access_token')
-        if short_access_token:
-            result_dict = get_fb_long_token(short_access_token)
-            long_access_token = result_dict.get('access_token')
-            token_expires_in = result_dict.get('expires')
-            if long_access_token and token_expires_in:
-                fb_access_token = long_access_token
-                fb_access_token_expiry_date = datetime.fromtimestamp(
-                        int(time.time()) + int(token_expires_in) - 10)
-                @after_this_request
-                def set_user_cookie(response):
-                    expiry_date_timestamp = time.mktime(
-                            fb_access_token_expiry_date.timetuple())
-                    response.set_cookie('fb_access_token_expires_on',
-                            expiry_date_timestamp, 31536000)
-                    # TODO(Sandy): Migrate to Flask sessions...
-                    response.set_cookie('fb_access_token',
-                            fb_access_token, 31536000)
-                    return response
-            else:
-                logging.warn('Failed to exchange (%s) for long access token'
-                        % short_access_token)
-        else:
-            # XXX(Sandy): Fix bug where double login causes logout. infact, find
-            # out why errors cause logouts at all
-            logging.warn('Failed to exchange code (%s) for token' % code)
-    else:
-        # Shouldn't happen, Facebook messed up
-        logging.warn('No "code" field in fbsr. Blame FB')
+    fb_data = get_fb_data(fbsr)
+    fbid = fb_data['fbid']
+    fb_access_token= fb_data['access_token']
+    fb_access_token_expiry_date = fb_data['expires_on']
 
     # FIXME[uw](mack): Someone could pass fake fb_access_token for an fbid, need to
     # validate on facebook before creating the user. (Sandy): See the note above on using signed_request
@@ -775,6 +816,13 @@ def login():
         user.fb_access_token = fb_access_token
         user.fb_access_token_expiry_date = fb_access_token_expiry_date
         user.save()
+
+        expiry_date_timestamp = time.mktime(
+                fb_access_token_expiry_date.timetuple())
+        update_client_cookie({
+            'fb_access_token_expires_on': expiry_date_timestamp,
+            'fb_access_token': fb_access_token,
+        });
         rmclogger.log_event(
             rmclogger.LOG_CATEGORY_IMPRESSION,
             rmclogger.LOG_EVENT_LOGIN, {
@@ -813,6 +861,14 @@ def login():
         }
         user = m.User(**user_obj)
         user.save()
+
+        expiry_date_timestamp = time.mktime(
+                fb_access_token_expiry_date.timetuple())
+        update_client_cookie({
+            'fb_access_token_expires_on': expiry_date_timestamp,
+            'fb_access_token': fb_access_token,
+        });
+
         rmclogger.log_event(
             rmclogger.LOG_CATEGORY_IMPRESSION,
             rmclogger.LOG_EVENT_LOGIN, {
@@ -1035,6 +1091,54 @@ def search_courses():
         'has_more': has_more,
     })
 
+@app.route('/api/renew-fb', methods=['POST'])
+@login_required
+def renew_fb():
+    req = flask.request
+    current_user = get_current_user()
+
+    rmclogger.log_event(
+        rmclogger.LOG_CATEGORY_API,
+        rmclogger.LOG_EVENT_RENEW_FB, {
+            'user_id': current_user.id,
+            'request_form': req.form,
+        }
+    )
+
+    fbsr = req.form.get('fb_signed_request')
+    if fbsr is None:
+        logging.warn('No fbsr set')
+        raise ApiError('No fbsr set')
+
+    # May be used later
+    #fb_data = parse_signed_request(fbsr, get_fb_app_secret())
+    #if fb_data is None:
+    #    # Data is invalid
+    #    logging.warn("Invalid Facebook signed request for user with fbid=%s"
+    #            % current_user.fbid)
+    #    raise ApiError("Invalid Facebook signed request for user with fbid=%s"
+    #            % current_user.fbid)
+
+    fb_data = get_fb_data(fbsr)
+    fbid = fb_data['fbid']
+    access_token = fb_data['access_token']
+    expires_on = fb_data['expires_on']
+
+    if expires_on > current_user.fb_access_token_expiry_date:
+        # Only use the new token if it expires later. It might be the case that
+        # get_fb_data failed to grab a new token
+        current_user.fb_access_token_expiry_date = expires_on
+        current_user.fb_access_token = access_token
+        current_user.save()
+
+        expiry_date_timestamp = time.mktime(
+                fb_access_token_expiry_date.timetuple())
+        set_user_cookies({
+            'fb_access_token_expires_on': expiry_date_timestamp,
+            'fb_access_token': fb_access_token,
+        });
+
+    return ''
 
 @app.route('/api/transcript', methods=['POST'])
 @login_required

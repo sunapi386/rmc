@@ -4,9 +4,9 @@ function($, _, __) {
 
   var fbApiInit = false;
   if (window.pageData.env === 'dev') {
-    var fbAppId = '289196947861602';
+    fbAppId = '289196947861602';
   } else {
-    var fbAppId = '219309734863464';
+    fbAppId = '219309734863464';
   }
 
   var _initializedFacebook = false;
@@ -21,10 +21,18 @@ function($, _, __) {
     }
   };
 
+  var fbSignedRequest;
   window.fbAsyncInit = function() {
     initFacebook();
     FB.getLoginStatus(function(response) {
       fbApiInit = true;
+      if (response.status === 'connected') {
+        fbSignedRequest = response.authResponse.signedRequest;
+      } else if (response.status === 'not_authorized') {
+        // the user is logged in to Facebook, but didn't auth yet
+      } else {
+        // the user isn't logged in to Facebook.
+      }
     });
   };
 
@@ -157,10 +165,60 @@ function($, _, __) {
     }
   }
 
+  var renewAccessToken = function() {
+    // TODO(Sandy): Grab fbsr from the Fb.getLoginStatus endpoint and hit /login
+    console.log('pretend to renew access token');
+    if (fbSignedRequest) {
+      console.log('cookies before');
+      console.log($.cookie('fb_access_token'));
+      console.log($.cookie('fb_access_token_expires_on'));
+      $.ajax('/api/renew-fb', {
+        data: { fb_signed_request: fbSignedRequest },
+        type: 'POST',
+        error: function(xhr) {
+          // TODO(Sandy): Maybe code here to delay the next renew request? The
+          // reason being that if facebook ever breaks down, then we'll
+          // a warning logged to HipChat for every page-visit of a logged in
+          // user...that's a lot. Alternatively, we could do this server-side
+        }
+      });
+      console.log('cookies after');
+      console.log($.cookie('fb_access_token'));
+      console.log($.cookie('fb_access_token_expires_on'));
+    } else {
+      // TODO(Sandy): Throw client error. This shouldn't be possible right now
+    }
+  };
+
+  var checkAccessToken = function() {
+    // XXX(Sandy): Note to reviewers: What is your opinion on defining local
+    // variables things that are used a few times? I've heard arguments for
+    // portability, readability, etc. what do you guys prefer?
+    var expiryTimestamp = $.cookie('fb_access_token_expires_on');
+    // Simulate cookie expiration
+    //expiryTimestamp -= 60 * 60 * 24;
+    // TODO(Sandy): Handle the case where the cookie was cleared for whatever
+    // reason. we still wnat to renew in that case (eg. renew if fbsr is
+    // present and this is not)
+    // TODO(Sandy): actually moving this logic to server-side might simplify
+    // things. eg. other cases of tokens expiring (logouts, un-auths, etc)
+    if (expiryTimestamp) {
+      expiryDate = new Date(1000 * expiryTimestamp);
+      // TODO(Sandy): When handling users with FB Adblocked, consider this case
+      // as well (right now it should fail gracefully, but we still want a way to
+      // renew the token)
+      // The token lasts for 60 days. Renew after every day
+      if (expiryDate - new Date() < 1000 * 60 * 60 * 24 * 59) {
+        renewAccessToken();
+      }
+    }
+  };
+
   // These methods require that the FB api is fully initialized
   var ensureInitMethods = {
     initConnectButton: initConnectButton,
-    showSendDialogProfile: showSendDialogProfile
+    showSendDialogProfile: showSendDialogProfile,
+    checkAccessToken: checkAccessToken
   };
   // Ensure FB is initialized before calling any functions that require FB APIs
   _.each(ensureInitMethods, function(method, name) {
@@ -172,33 +230,7 @@ function($, _, __) {
     };
   });
 
-  var renewAccessToken = function() {
-    // TODO(Sandy): Grab fbsr from the Fb.getLoginStatus endpoint and hit /login
-    console.log('pretend to renew access token');
-  }
-
-  var init = function() {
-    // XXX(Sandy): Note to reviewers: What is your opinion on defining local
-    // variables things that are used a few times? I've heard arguments for
-    // portability, readability, etc. what do you guys prefer?
-    expiry_timestamp = $.cookie('fb_access_token_expires_on');
-    //expiry_timestamp -= 60 * 60 * 24;
-    if (expiry_timestamp) {
-      expiry_date = new Date(1000 * expiry_timestamp);
-      // Renew the token every day
-      // TODO(Sandy): When handling users with FB Adblocked, consider this case
-      // as well (right now it should fail gracefully, but we still want a way to
-      // renew the token)
-      if (expiry_date - new Date() < 1000 * 60 * 60 * 24 * 59) {
-        renewAccessToken();
-      }
-    }
-  }
-
-  // XXX(Sandy): Note to reviewers: This is low priority and we want to defer
-  // until after _everything_ is loaded and finished. What's the best way of
-  // doing that?
-  $(init());
+  $(ensureInitMethods.checkAccessToken);
 
   return _.extend(ensureInitMethods, {
     initFacebook: initFacebook,
