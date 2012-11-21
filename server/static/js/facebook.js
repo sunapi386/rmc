@@ -72,8 +72,13 @@ function($, _, __) {
 
     $.ajax('/login', {
       data: params,
+      dataType: 'json',
       type: 'POST',
       success: function(data) {
+        $.cookie('fb_access_token',
+            data.fb_access_token, { expires: 365, path: '/' });
+        $.cookie('fb_access_token_expires_on',
+            data.fb_access_token_expires_on, { expires: 365, path: '/' });
         // Fail safe to make sure at least we sent off the _gaq trackEvent
         _gaq.push(function() {
           if (nextUrl) {
@@ -175,6 +180,17 @@ function($, _, __) {
       console.log($.cookie('fb_access_token_expires_on'));
       $.ajax('/api/renew-fb', {
         data: { fb_signed_request: fbSignedRequest },
+        dataType: 'json',
+        success: function(data) {
+          $.cookie('fb_access_token',
+              data.fb_access_token, { expires: 365, path: '/' });
+          $.cookie('fb_access_token_expires_on',
+              data.fb_access_token_expires_on, { expires: 365, path: '/' });
+
+          console.log('cookies after');
+          console.log($.cookie('fb_access_token'));
+          console.log($.cookie('fb_access_token_expires_on'));
+        },
         type: 'POST',
         error: function(xhr) {
           // TODO(Sandy): Maybe code here to delay the next renew request? The
@@ -183,9 +199,6 @@ function($, _, __) {
           // user...that's a lot. Alternatively, we could do this server-side
         }
       });
-      console.log('cookies after');
-      console.log($.cookie('fb_access_token'));
-      console.log($.cookie('fb_access_token_expires_on'));
     } else {
       // TODO(Sandy): Throw client error. This shouldn't be possible right now
     }
