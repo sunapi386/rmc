@@ -1,8 +1,9 @@
 define(
-['rmc_backbone', 'ext/jquery', 'ext/jqueryui', 'ext/underscore', 'ext/underscore.string',
-'ratings', 'ext/select2', 'ext/autosize', 'course', 'user', 'ext/bootstrap', 'prof'],
-function(RmcBackbone, $, _jqueryui, _, _s, ratings, _select2, _autosize, _course, _user,
-  _bootstrap, _prof) {
+['rmc_backbone', 'ext/jquery', 'ext/jqueryui', 'ext/underscore',
+'ext/underscore.string', 'ratings', 'ext/select2', 'ext/autosize', 'course',
+'user', 'ext/bootstrap', 'prof', 'facebook'],
+function(RmcBackbone, $, _jqueryui, _, _s, ratings, _select2, _autosize,
+    _course, _user, _bootstrap, _prof, _facebook) {
 
   // TODO(david): Refactor to use sub-models for reviews
   // TODO(david): Refactor this model to match our mongo UserCourse model
@@ -233,8 +234,10 @@ function(RmcBackbone, $, _jqueryui, _, _s, ratings, _select2, _autosize, _course
 
     saveComments: function(view, reviewType) {
       this.logToGA(reviewType, 'REVIEW');
+
+      var reviewTypeStr = reviewType.toLowerCase();
       this.save()
-        .done(_.bind(view.saveSuccess, view))
+        .done(_.bind(view.saveSuccess, view, this.userCourse, reviewTypeStr))
         .error(_.bind(view.saveError, view));
 
       mixpanel.track('Reviewing: Save comments', {
@@ -301,7 +304,7 @@ function(RmcBackbone, $, _jqueryui, _, _s, ratings, _select2, _autosize, _course
       _.defer(function() { $comments.trigger('input'); });
 
       if (this.review.get('comment')) {
-        this.saveSuccess();
+        this.showSaved();
         this.onFocus();
       }
 
@@ -344,13 +347,25 @@ function(RmcBackbone, $, _jqueryui, _, _s, ratings, _select2, _autosize, _course
         .html('<i class="icon-save"></i> Update!');
     },
 
-    saveSuccess: function() {
+    showSaved: function() {
       this.saving = false;
       this.$('.save-review')
         .removeClass('btn-warning btn-danger btn-primary')
         .addClass('btn-success')
         .prop('disabled', true)
         .html('<i class="icon-ok"></i> Posted.');
+    },
+
+    saveSuccess: function(userCourse, reviewTypeStr) {
+      this.showSaved();
+
+      var name = 'See my ' + reviewTypeStr + ' review on ' +
+          userCourse.get('course').get('code');
+      var callback = function(response) {
+        // response.post_id is returned on success
+        // response === null on "Cancel"
+      };
+      _facebook.showFeedDialog(name, callback);
     },
 
     saveError: function() {
