@@ -172,7 +172,6 @@ function($, _, __) {
   }
 
   var renewAccessToken = function() {
-    // TODO(Sandy): Grab fbsr from the Fb.getLoginStatus endpoint and hit /login
     console.log('pretend to renew access token');
     if (fbSignedRequest) {
       console.log('cookies before');
@@ -205,26 +204,8 @@ function($, _, __) {
   };
 
   var checkAccessToken = function() {
-    // XXX(Sandy): Note to reviewers: What is your opinion on defining local
-    // variables things that are used a few times? I've heard arguments for
-    // portability, readability, etc. what do you guys prefer?
-    var expiryTimestamp = $.cookie('fb_access_token_expires_on');
-    // Simulate cookie expiration
-    //expiryTimestamp -= 60 * 60 * 24;
-    // TODO(Sandy): Handle the case where the cookie was cleared for whatever
-    // reason. we still wnat to renew in that case (eg. renew if fbsr is
-    // present and this is not)
-    // TODO(Sandy): actually moving this logic to server-side might simplify
-    // things. eg. other cases of tokens expiring (logouts, un-auths, etc)
-    if (expiryTimestamp) {
-      expiryDate = new Date(1000 * expiryTimestamp);
-      // TODO(Sandy): When handling users with FB Adblocked, consider this case
-      // as well (right now it should fail gracefully, but we still want a way to
-      // renew the token)
-      // The token lasts for 60 days. Renew after every day
-      if (expiryDate - new Date() < 1000 * 60 * 60 * 24 * 59) {
+    if (window.pageData.should_renew_fb_token) {
         renewAccessToken();
-      }
     }
   };
 

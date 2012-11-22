@@ -1,3 +1,4 @@
+import datetime
 import itertools
 
 import mongoengine as me
@@ -42,6 +43,7 @@ class User(me.Document):
     # http://stackoverflow.com/questions/4408945/what-is-the-length-of-the-access-token-in-facebook-oauth2
     fb_access_token = me.StringField(max_length=255, required=True, unique=True)
     fb_access_token_expiry_date = me.DateTimeField(required=True)
+    fb_access_token_expired = me.BooleanField(default=False)
 
     email = me.EmailField()
 
@@ -150,6 +152,14 @@ class User(me.Document):
             if _term.Term.is_shortlist_term(uc.term_id):
                 return True
         return False
+
+    @property
+    def should_renew_fb_token(self):
+        # Should renew FB token if it expired or will expire in under 59 days.
+        # A long token normally lasts for 60 days
+        future_date = datetime.datetime.now() + datetime.timedelta(days=59)
+        return (self.fb_access_token_expiry_date < future_date or
+            self.fb_access_token_expired)
 
     def get_user_courses(self):
         return _user_course.UserCourse.objects(id__in=self.course_history)

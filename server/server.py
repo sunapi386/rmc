@@ -33,12 +33,18 @@ r = redis.StrictRedis(host=c.REDIS_HOST, port=c.REDIS_PORT, db=c.REDIS_DB)
 
 flask_render_template = flask.render_template
 def render_template(*args, **kwargs):
+    current_user = get_current_user()
+    should_renew_fb_token = False
+    if current_user:
+        should_renew_fb_token = current_user.should_renew_fb_token
+
     kwargs.update({
         'env': app.config['ENV'],
         'VERSION': VERSION,
         'js_dir': app.config['JS_DIR'],
         'ga_property_id': app.config['GA_PROPERTY_ID'],
-        'current_user': get_current_user(),
+        'current_user': current_user,
+        'should_renew_fb_token': should_renew_fb_token,
     })
     return flask_render_template(*args, **kwargs)
 flask.render_template = render_template
@@ -932,6 +938,11 @@ def search_courses():
 @app.route('/api/renew-fb', methods=['POST'])
 @login_required
 def renew_fb():
+    '''
+    Renews the current user's Facebook access token.
+
+    Takes {'fb_signed_request': obj} from the request.
+    '''
     req = flask.request
     current_user = get_current_user()
 
