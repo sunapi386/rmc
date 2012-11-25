@@ -89,13 +89,13 @@ function(RmcBackbone, $, _jqueryui, _, _s, ratings, _select2, _autosize,
       var caption = 'on Flow';
 
       var courseCode = this.get('course').get('code');
+      // TODO(Sandy): Turn these into enums or something?
       if (reviewType === 'COURSE') {
-        name = 'My course review for ' + courseCode;
+        name = 'I reviewed ' + courseCode;
         description = this.get('course_review').get('comment');
       } else if (reviewType === 'PROFESSOR') {
-        name = 'My professor review on ' +
-            this.get('professor').get('name') +
-            ' for ' + courseCode;
+        name = 'I commented on my ' + courseCode + ' professor ' +
+            this.get('professor').get('name');
         description = this.get('professor_review').get('comment');
       }
       description = _util.truncatePreviewString(description, 50);
@@ -139,7 +139,6 @@ function(RmcBackbone, $, _jqueryui, _, _s, ratings, _select2, _autosize,
         placeholder: 'Comment about the professor...'
       });
 
-      // TODO(Sandy): Where to put constants like COURSE and PROFESSOR?
       courseReview.on('change:comment', _.bind(this.saveComments, this,
             this.courseCommentView, 'COURSE'));
       profReview.on('change:comment', _.bind(this.saveComments, this,
@@ -267,7 +266,7 @@ function(RmcBackbone, $, _jqueryui, _, _s, ratings, _select2, _autosize,
       this.logToGA(reviewType, 'REVIEW');
 
       this.save()
-        .done(_.bind(view.saveSuccess, view, this.userCourse, reviewType))
+        .done(_.bind(view.saveSuccess, view, this.userCourse))
         .error(_.bind(view.saveError, view));
 
       mixpanel.track('Reviewing: Save comments', {
@@ -386,7 +385,7 @@ function(RmcBackbone, $, _jqueryui, _, _s, ratings, _select2, _autosize,
         .html('<i class="icon-ok"></i> Posted.');
     },
 
-    saveSuccess: function(userCourse, reviewType) {
+    saveSuccess: function(userCourse) {
       this.showSaved();
     },
 
