@@ -137,7 +137,6 @@ function($, _, __) {
   // TODO(Sandy): Don't hardcode this?
   var dialogBaseUrl = 'http://uwflow.com';
   var logoPath = '/static/img/logo/flow_75x75.png';
-  var dialogDesc = 'Plan your courses with friends in mind!';
 
   var showSendDialogProfile = function(cb) {
     FB.ui({
@@ -145,18 +144,18 @@ function($, _, __) {
       name: 'Flow',
       link: dialogBaseUrl,
       picture: dialogBaseUrl + logoPath,
-      description: dialogDesc
+      description: 'Plan your courses with friends in mind!'
     }, cb);
   };
 
-  var showFeedDialog = function(name, cb) {
+  var showFeedDialog = function(name, caption, description, cb) {
     FB.ui({
       method: 'feed',
       link: dialogBaseUrl,
       picture: dialogBaseUrl + logoPath,
       name: name,
-      caption: 'Flow',
-      description: dialogDesc
+      caption: caption,
+      description: description
     }, cb);
   };
 

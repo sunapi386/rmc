@@ -1,9 +1,9 @@
 define(
 ['rmc_backbone', 'ext/jquery', 'ext/jqueryui', 'ext/underscore',
 'ext/underscore.string', 'ratings', 'ext/select2', 'ext/autosize', 'course',
-'user', 'ext/bootstrap', 'prof', 'facebook'],
+'user', 'ext/bootstrap', 'prof', 'facebook', 'util'],
 function(RmcBackbone, $, _jqueryui, _, _s, ratings, _select2, _autosize,
-    _course, _user, _bootstrap, _prof, _facebook) {
+    _course, _user, _bootstrap, _prof, _facebook, _util) {
 
   // TODO(david): Refactor to use sub-models for reviews
   // TODO(david): Refactor this model to match our mongo UserCourse model
@@ -25,7 +25,8 @@ function(RmcBackbone, $, _jqueryui, _, _s, ratings, _select2, _autosize,
     referenceFields: function() {
       return {
         'user': [ 'user_id', _user.UserCollection ],
-        'course': [ 'course_id', _course.CourseCollection ]
+        'course': [ 'course_id', _course.CourseCollection ],
+        'professor': [ 'professor_id', _prof.ProfCollection ]
       };
     },
 
@@ -80,6 +81,35 @@ function(RmcBackbone, $, _jqueryui, _, _s, ratings, _select2, _autosize,
       return this.get('course_review').get('ratings').find(function(rating) {
         return rating.get('name') === 'interest';
       });
+    },
+
+    promptPostToFacebook: function(reviewType) {
+      var name = '';
+      var description = '';
+      var caption = 'on Flow';
+
+      var courseCode = this.get('course').get('code');
+      if (reviewType === 'COURSE') {
+        name = 'My course review for ' + courseCode;
+        description = this.get('course_review').get('comment');
+      } else if (reviewType === 'PROFESSOR') {
+        name = 'My professor review on ' +
+            this.get('professor').get('name') +
+            ' for ' + courseCode;
+        description = this.get('professor_review').get('comment');
+      }
+      description = _util.truncatePreviewString(description, 50);
+
+      var callback = function(response) {
+        // response.post_id is returned on success
+        // response === null on "Cancel"
+        if (response && response.post_id) {
+          // Award points!
+        }
+      };
+
+      // TODO(Sandy): Pass in proper link instead of just uwflow.com
+      _facebook.showFeedDialog(name, caption, description, callback);
     }
   });
 
@@ -109,6 +139,7 @@ function(RmcBackbone, $, _jqueryui, _, _s, ratings, _select2, _autosize,
         placeholder: 'Comment about the professor...'
       });
 
+      // TODO(Sandy): Where to put constants like COURSE and PROFESSOR?
       courseReview.on('change:comment', _.bind(this.saveComments, this,
             this.courseCommentView, 'COURSE'));
       profReview.on('change:comment', _.bind(this.saveComments, this,
@@ -235,9 +266,8 @@ function(RmcBackbone, $, _jqueryui, _, _s, ratings, _select2, _autosize,
     saveComments: function(view, reviewType) {
       this.logToGA(reviewType, 'REVIEW');
 
-      var reviewTypeStr = reviewType.toLowerCase();
       this.save()
-        .done(_.bind(view.saveSuccess, view, this.userCourse, reviewTypeStr))
+        .done(_.bind(view.saveSuccess, view, this.userCourse, reviewType))
         .error(_.bind(view.saveError, view));
 
       mixpanel.track('Reviewing: Save comments', {
@@ -356,16 +386,8 @@ function(RmcBackbone, $, _jqueryui, _, _s, ratings, _select2, _autosize,
         .html('<i class="icon-ok"></i> Posted.');
     },
 
-    saveSuccess: function(userCourse, reviewTypeStr) {
+    saveSuccess: function(userCourse, reviewType) {
       this.showSaved();
-
-      var name = 'See my ' + reviewTypeStr + ' review on ' +
-          userCourse.get('course').get('code');
-      var callback = function(response) {
-        // response.post_id is returned on success
-        // response === null on "Cancel"
-      };
-      _facebook.showFeedDialog(name, callback);
     },
 
     saveError: function() {
